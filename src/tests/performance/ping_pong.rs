@@ -111,9 +111,6 @@ async fn throughput() {
     // │    800│      1000│         0│      3992│           101│         0│         1│         1│         2│       497│         26.25│     23.95│     8767.65│
     // └───────┴──────────┴──────────┴──────────┴──────────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────────┴──────────┴────────────┘
 
-    // setup metrics recorder
-    let recorder = SimpleRecorder::default();
-
     // number of concurrent peers to test (zcashd hardcaps `max_peers` to 873 on my machine)
     let synth_counts = vec![
         1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 500, 750, 800,
@@ -132,8 +129,8 @@ async fn throughput() {
     let node_addr = node.addr();
 
     for synth_count in synth_counts {
-        // clear metrics and register metrics
-        recorder.clear();
+        // register metrics
+        let recorder = SimpleRecorder::default();
         metrics::register_histogram!(METRIC_LATENCY);
 
         // create N peer nodes which send M ping's as fast as possible
