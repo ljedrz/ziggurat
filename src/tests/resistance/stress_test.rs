@@ -21,7 +21,7 @@ use crate::{
             COMMANDS_WITH_PAYLOADS,
         },
         metrics::{
-            recorder,
+            recorder::SimpleRecorder,
             tables::{duration_as_ms, fmt_table, table_float_display, RequestStats, RequestsTable},
         },
         synthetic_node::SyntheticNode,
@@ -200,7 +200,7 @@ async fn throughput() {
     // └───────┴──────────┴──────────┴──────────┴──────────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────────┴──────────┴────────────┘
 
     // enable simple metrics recording
-    recorder::enable_simple_recorder().unwrap();
+    let recorder = SimpleRecorder::default();
 
     const TIMEOUT: tokio::time::Duration = tokio::time::Duration::from_secs(20);
 
@@ -235,7 +235,7 @@ async fn throughput() {
     for peers in synth_counts {
         let iteration_timer = tokio::time::Instant::now();
         // register metrics
-        recorder::clear();
+        recorder.clear();
         metrics::register_histogram!(REQUEST_LATENCY);
         metrics::register_histogram!(HANDSHAKE_LATENCY);
         metrics::register_counter!(HANDSHAKE_ACCEPTED);
@@ -299,11 +299,10 @@ async fn throughput() {
         let iteration_time = iteration_timer.elapsed().as_secs_f64();
 
         // update request latencies table
-        let request_latencies = recorder::histograms()
-            .lock()
+        let request_latencies = recorder
+            .histograms()
             .get(&metrics::Key::from_name(REQUEST_LATENCY))
             .unwrap()
-            .value
             .clone();
         let row = RequestStats::new(
             peers as u16,
@@ -314,11 +313,10 @@ async fn throughput() {
         request_table.add_row(row);
 
         // update handshake latencies table
-        let handshake_latencies = recorder::histograms()
-            .lock()
+        let handshake_latencies = recorder
+            .histograms()
             .get(&metrics::Key::from_name(HANDSHAKE_LATENCY))
             .unwrap()
-            .value
             .clone();
         let row = RequestStats::new(peers as u16, 1, handshake_latencies, iteration_time);
         handshake_table.add_row(row);
@@ -332,43 +330,32 @@ async fn throughput() {
             ..Default::default()
         };
         {
-            let counters = recorder::counters();
-            let locked_counters = counters.lock();
+            let counters = recorder.counters();
 
-            stat.handshake_accepted = locked_counters
+            stat.handshake_accepted = *counters
                 .get(&metrics::Key::from_name(HANDSHAKE_ACCEPTED))
-                .unwrap()
-                .value as u16;
-            stat.handshake_rejected = locked_counters
+                .unwrap() as u16;
+            stat.handshake_rejected = *counters
                 .get(&metrics::Key::from_name(HANDSHAKE_REJECTED))
-                .unwrap()
-                .value as u16;
+                .unwrap() as u16;
 
-            stat.corrupt_terminated = locked_counters
+            stat.corrupt_terminated = *counters
                 .get(&metrics::Key::from_name(CORRUPT_TERMINATED))
-                .unwrap()
-                .value as u16;
-            stat.corrupt_ignored = locked_counters
+                .unwrap() as u16;
+            stat.corrupt_ignored = *counters
                 .get(&metrics::Key::from_name(CORRUPT_IGNORED))
-                .unwrap()
-                .value as u16;
-            stat.corrupt_rejected = locked_counters
+                .unwrap() as u16;
+            stat.corrupt_rejected = *counters
                 .get(&metrics::Key::from_name(CORRUPT_REJECTED))
-                .unwrap()
-                .value as u16;
-            stat.corrupt_reply = locked_counters
+                .unwrap() as u16;
+            stat.corrupt_reply = *counters
                 .get(&metrics::Key::from_name(CORRUPT_REPLY))
-                .unwrap()
-                .value as u16;
+                .unwrap() as u16;
 
-            stat.peers_dropped = locked_counters
+            stat.peers_dropped = *counters
                 .get(&metrics::Key::from_name(CONNECTION_TERMINATED))
-                .unwrap()
-                .value as u16;
-            stat.reply_errors = locked_counters
-                .get(&metrics::Key::from_name(BAD_REPLY))
-                .unwrap()
-                .value as u16;
+                .unwrap() as u16;
+            stat.reply_errors = *counters.get(&metrics::Key::from_name(BAD_REPLY)).unwrap() as u16;
         }
 
         stats.push(stat);
